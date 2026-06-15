@@ -1,104 +1,67 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
+
 import {
-  useNavigate,
-  Link,
-} from "react-router-dom";
+  sendPasswordResetEmail,
+} from "firebase/auth";
+
+import { auth } from "../firebase/config";
 
 function RecuperarPassword() {
-  const navigate = useNavigate();
-
   const [email, setEmail] =
     useState("");
 
-  const [password, setPassword] =
-    useState("");
-
-  const actualizarPassword = (
-    e
-  ) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const usuario = JSON.parse(
-      localStorage.getItem("usuario")
-    );
-
-    if (!usuario) {
-      alert(
-        "No existe usuario registrado"
+    try {
+      await sendPasswordResetEmail(
+        auth,
+        email
       );
-      return;
-    }
 
-    if (usuario.email !== email) {
       alert(
-        "El correo no coincide"
+        "Se envió un correo para restablecer tu contraseña."
       );
-      return;
+    } catch (error) {
+      alert(error.message);
     }
-
-    usuario.password = password;
-
-    localStorage.setItem(
-      "usuario",
-      JSON.stringify(usuario)
-    );
-
-    alert(
-      "Contraseña actualizada"
-    );
-
-    navigate("/login");
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h1>
-          Recuperar Contraseña
-        </h1>
+    <div className="login-container">
+      <div className="login-card">
 
-        <form
-          onSubmit={
-            actualizarPassword
-          }
-        >
+        <h1>🔑 Recuperar Contraseña</h1>
+
+        <p className="login-subtitle">
+          Ingresa tu correo electrónico
+        </p>
+
+        <form onSubmit={handleSubmit}>
+
           <input
             type="email"
-            placeholder="Correo registrado"
+            placeholder="Correo electrónico"
             value={email}
             onChange={(e) =>
-              setEmail(
-                e.target.value
-              )
+              setEmail(e.target.value)
             }
             required
           />
 
-          <input
-            type="password"
-            placeholder="Nueva contraseña"
-            value={password}
-            onChange={(e) =>
-              setPassword(
-                e.target.value
-              )
-            }
-            required
-          />
-
-          <button
-            className="btn-primary"
-            type="submit"
-          >
-            Actualizar
+          <button type="submit">
+            Enviar enlace
           </button>
+
         </form>
 
-        <br />
+        <div className="login-links">
+          <Link to="/login">
+            Volver al login
+          </Link>
+        </div>
 
-        <Link to="/login">
-          Volver al Login
-        </Link>
       </div>
     </div>
   );

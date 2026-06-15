@@ -1,108 +1,111 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
 import ClientForm from "../components/ClientForm";
-import { useLocalStorage } from "../hooks/useLocalStorage";
+
+import {
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+  query,
+  where,
+} from "firebase/firestore";
+
+import { db } from "../firebase/config";
 
 function Clientes() {
-  const [clientes, setClientes] =
-    useLocalStorage("clientes", []);
+  const [clientes, setClientes] = useState([]);
 
   const [busqueda, setBusqueda] =
     useState("");
 
-  const [editandoId, setEditandoId] =
-    useState(null);
-
-  const [nombreEdit, setNombreEdit] =
-    useState("");
-
-  const [telefonoEdit, setTelefonoEdit] =
-    useState("");
-
-  const [direccionEdit, setDireccionEdit] =
-    useState("");
-
-  const agregarCliente = (cliente) => {
   const sesion = JSON.parse(
     localStorage.getItem("sesion")
   );
 
-  const nuevoCliente = {
-    ...cliente,
-    usuarioId: sesion.id,
-  };
+  const cargarClientes = async () => {
+  try {
+    const q = query(
+      collection(db, "clientes"),
+      where(
+        "usuarioId",
+        "==",
+        sesion.uid
+      )
+    );
 
-  setClientes([
-    ...clientes,
-    nuevoCliente,
-  ]);
+    const snapshot =
+      await getDocs(q);
+
+    const lista =
+      snapshot.docs.map((documento) => ({
+        ...documento.data(),
+        firestoreId: documento.id,
+      }));
+
+    setClientes(lista);
+  } catch (error) {
+    console.log(error);
+  }
 };
 
-  const eliminarCliente = (id) => {
-    const confirmar = window.confirm(
-      "¿Eliminar cliente?"
-    );
+  useEffect(() => {
+    cargarClientes();
+  }, []);
 
-    if (!confirmar) return;
-
-    setClientes(
-      clientes.filter((c) => c.id !== id)
-    );
-  };
-
-  const iniciarEdicion = (cliente) => {
-    setEditandoId(cliente.id);
-    setNombreEdit(cliente.nombre);
-    setTelefonoEdit(cliente.telefono);
-    setDireccionEdit(cliente.direccion);
-  };
-
-  const guardarEdicion = () => {
-    const nuevosClientes =
-      clientes.map((cliente) => {
-        if (cliente.id === editandoId) {
-          return {
+  const agregarCliente =
+    async (cliente) => {
+      try {
+        await addDoc(
+          collection(db, "clientes"),
+          {
             ...cliente,
-            nombre: nombreEdit,
-            telefono: telefonoEdit,
-            direccion: direccionEdit,
-          };
-        }
+            usuarioId:
+              sesion.uid,
+          }
+        );
 
-        return cliente;
-      });
+        cargarClientes();
+      } catch (error) {
+        console.log(error);
+      }
+    };
 
-    setClientes(nuevosClientes);
+  const eliminarCliente =
+  async (id) => {
+    try {
+      await deleteDoc(
+        doc(
+          db,
+          "clientes",
+          id
+        )
+      );
 
-    setEditandoId(null);
-    setNombreEdit("");
-    setTelefonoEdit("");
-    setDireccionEdit("");
+      cargarClientes();
+    } catch (error) {
+      console.log(error);
+    }
   };
 
-  const cancelarEdicion = () => {
-    setEditandoId(null);
-  };
-
- const sesion = JSON.parse(
-  localStorage.getItem("sesion")
-);
-
-const filtrados = clientes.filter(
-  (c) =>
-    c.usuarioId === sesion.id &&
-    c.nombre
-      .toLowerCase()
-      .includes(
-        busqueda.toLowerCase()
-      )
-);
+  const filtrados =
+    clientes.filter((c) =>
+      c.nombre
+        .toLowerCase()
+        .includes(
+          busqueda.toLowerCase()
+        )
+    );
 
   return (
     <div className="clientes-container">
       <h1>Clientes</h1>
 
       <div className="form-card">
-        <ClientForm onAdd={agregarCliente} />
+        <ClientForm
+          onAdd={agregarCliente}
+        />
       </div>
 
       <input
@@ -111,7 +114,9 @@ const filtrados = clientes.filter(
         placeholder="🔍 Buscar cliente..."
         value={busqueda}
         onChange={(e) =>
-          setBusqueda(e.target.value)
+          setBusqueda(
+            e.target.value
+          )
         }
       />
 
@@ -127,102 +132,42 @@ const filtrados = clientes.filter(
           </thead>
 
           <tbody>
-            {filtrados.map((cliente) => (
-              <tr key={cliente.id}>
-                <td>
-                  {editandoId === cliente.id ? (
-                    <input
-                      value={nombreEdit}
-                      onChange={(e) =>
-                        setNombreEdit(
-                          e.target.value
-                        )
-                      }
-                    />
-                  ) : (
-                    cliente.nombre
-                  )}
-                </td>
+            {filtrados.map(
+              (cliente) => (
+                <tr
+                  key={cliente.id}
+                >
+                  <td>
+                    {cliente.nombre}
+                  </td>
 
-                <td>
-                  {editandoId === cliente.id ? (
-                    <input
-                      value={telefonoEdit}
-                      onChange={(e) =>
-                        setTelefonoEdit(
-                          e.target.value
-                        )
-                      }
-                    />
-                  ) : (
-                    cliente.telefono
-                  )}
-                </td>
+                  <td>
+                    {
+                      cliente.telefono
+                    }
+                  </td>
 
-                <td>
-                  {editandoId === cliente.id ? (
-                    <input
-                      value={direccionEdit}
-                      onChange={(e) =>
-                        setDireccionEdit(
-                          e.target.value
-                        )
-                      }
-                    />
-                  ) : (
-                    cliente.direccion
-                  )}
-                </td>
+                  <td>
+                    {
+                      cliente.direccion
+                    }
+                  </td>
 
-                <td>
-                  {editandoId === cliente.id ? (
-                    <>
-                      <button
-                        className="btn-primary"
-                        onClick={
-                          guardarEdicion
-                        }
-                      >
-                        Guardar
-                      </button>
-
-                      <button
-                        className="btn-delete"
-                        onClick={
-                          cancelarEdicion
-                        }
-                      >
-                        Cancelar
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        className="btn-edit"
-                        onClick={() =>
-                          iniciarEdicion(
-                            cliente
-                          )
-                        }
-                      >
-                        Editar
-                      </button>
-
-                      <button
-                        className="btn-delete"
-                        onClick={() =>
-                          eliminarCliente(
-                            cliente.id
-                          )
-                        }
-                      >
-                        Eliminar
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  <td>
+                    <button
+  className="btn-delete"
+  onClick={() =>
+    eliminarCliente(
+      cliente.firestoreId
+    )
+  }
+>
+  Eliminar
+</button>
+                  </td>
+                </tr>
+              )
+            )}
           </tbody>
         </table>
       </div>

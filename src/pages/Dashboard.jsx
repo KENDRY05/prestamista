@@ -1,44 +1,122 @@
-import { useLocalStorage } from "../hooks/useLocalStorage";
+import { useState, useEffect } from "react";
+
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
+
+import { db } from "../firebase/config";
 
 function Dashboard() {
-  const [clientes] =
-    useLocalStorage("clientes", []);
+  const [clientes, setClientes] =
+    useState([]);
 
-  const [prestamos] =
-    useLocalStorage("prestamos", []);
+  const [prestamos, setPrestamos] =
+    useState([]);
 
-  const [pagos] =
-    useLocalStorage("pagos", []);
+  const [pagos, setPagos] =
+    useState([]);
 
   const sesion = JSON.parse(
     localStorage.getItem("sesion")
   );
 
-  const clientesUsuario =
-    clientes.filter(
-      (c) => c.usuarioId === sesion.id
-    );
+  useEffect(() => {
+    cargarDatos();
+  }, []);
 
-  const prestamosUsuario =
-    prestamos.filter(
-      (p) => p.usuarioId === sesion.id
-    );
+  const cargarDatos =
+    async () => {
 
-  const pagosUsuario = pagos.filter(
-    (p) => p.usuarioId === sesion.id
-  );
+      const clientesQuery = query(
+        collection(db, "clientes"),
+        where(
+          "usuarioId",
+          "==",
+          sesion.uid
+        )
+      );
+
+      const prestamosQuery = query(
+        collection(db, "prestamos"),
+        where(
+          "usuarioId",
+          "==",
+          sesion.uid
+        )
+      );
+
+      const pagosQuery = query(
+        collection(db, "pagos"),
+        where(
+          "usuarioId",
+          "==",
+          sesion.uid
+        )
+      );
+
+      const clientesSnap =
+        await getDocs(
+          clientesQuery
+        );
+
+      const prestamosSnap =
+        await getDocs(
+          prestamosQuery
+        );
+
+      const pagosSnap =
+        await getDocs(
+          pagosQuery
+        );
+
+      setClientes(
+        clientesSnap.docs.map(
+          (doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })
+        )
+      );
+
+      setPrestamos(
+        prestamosSnap.docs.map(
+          (doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })
+        )
+      );
+
+      setPagos(
+        pagosSnap.docs.map(
+          (doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })
+        )
+      );
+    };
 
   const totalPrestado =
-    prestamosUsuario.reduce(
+    prestamos.reduce(
       (total, prestamo) =>
-        total + prestamo.monto,
+        total +
+        Number(
+          prestamo.monto || 0
+        ),
       0
     );
 
   const totalCobrado =
-    pagosUsuario.reduce(
+    pagos.reduce(
       (total, pago) =>
-        total + pago.monto,
+        total +
+        Number(
+          pago.monto || 0
+        ),
       0
     );
 
@@ -47,7 +125,7 @@ function Dashboard() {
       <h1>
         Bienvenido,
         {" "}
-        {sesion.nombre}
+        {sesion.email}
       </h1>
 
       <div className="cards">
@@ -55,25 +133,21 @@ function Dashboard() {
         <div className="card">
           <h3>Clientes</h3>
           <p>
-            {
-              clientesUsuario.length
-            }
+            {clientes.length}
           </p>
         </div>
 
         <div className="card">
           <h3>Préstamos</h3>
           <p>
-            {
-              prestamosUsuario.length
-            }
+            {prestamos.length}
           </p>
         </div>
 
         <div className="card">
           <h3>Cobros</h3>
           <p>
-            {pagosUsuario.length}
+            {pagos.length}
           </p>
         </div>
 

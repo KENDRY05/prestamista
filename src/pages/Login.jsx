@@ -4,6 +4,12 @@ import {
   useNavigate,
 } from "react-router-dom";
 
+import {
+  signInWithEmailAndPassword,
+} from "firebase/auth";
+
+import { auth } from "../firebase/config";
+
 function Login() {
   const navigate = useNavigate();
 
@@ -13,43 +19,41 @@ function Login() {
   const [password, setPassword] =
     useState("");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const usuarios =
-      JSON.parse(
-        localStorage.getItem("usuarios")
-      ) || [];
+    try {
+      const userCredential =
+        await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
 
-    const usuario = usuarios.find(
-      (u) =>
-        u.email.toLowerCase() ===
-          email.toLowerCase() &&
-        u.password === password
-    );
+      const user =
+        userCredential.user;
 
-    if (!usuario) {
+      localStorage.setItem(
+        "sesion",
+        JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          logueado: true,
+        })
+      );
+
+      navigate("/");
+    } catch (error) {
       alert(
         "Correo o contraseña incorrectos"
       );
-      return;
     }
-
-    localStorage.setItem(
-      "sesion",
-      JSON.stringify({
-        id: usuario.id,
-        nombre: usuario.nombre,
-        email: usuario.email,
-      })
-    );
-
-    navigate("/");
   };
 
   return (
     <div className="login-container">
       <div className="login-card">
+
         <h1>💰 Prestamista Pro</h1>
 
         <p className="login-subtitle">
@@ -57,12 +61,15 @@ function Login() {
         </p>
 
         <form onSubmit={handleSubmit}>
+
           <input
             type="email"
             placeholder="Correo electrónico"
             value={email}
             onChange={(e) =>
-              setEmail(e.target.value)
+              setEmail(
+                e.target.value
+              )
             }
             required
           />
@@ -72,7 +79,9 @@ function Login() {
             placeholder="Contraseña"
             value={password}
             onChange={(e) =>
-              setPassword(e.target.value)
+              setPassword(
+                e.target.value
+              )
             }
             required
           />
@@ -80,9 +89,11 @@ function Login() {
           <button type="submit">
             Iniciar Sesión
           </button>
+
         </form>
 
         <div className="login-links">
+
           <Link to="/recuperar">
             Recuperar contraseña
           </Link>
@@ -90,7 +101,9 @@ function Login() {
           <Link to="/register">
             Crear cuenta
           </Link>
+
         </div>
+
       </div>
     </div>
   );

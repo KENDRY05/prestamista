@@ -1,63 +1,141 @@
+import { useEffect, useState } from "react";
+
 import LoanForm from "../components/LoanForm";
-import { useLocalStorage } from "../hooks/useLocalStorage";
+
+import {
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+  query,
+  where,
+} from "firebase/firestore";
+
+import { db } from "../firebase/config";
 
 function Prestamos() {
-  const [clientes] = useLocalStorage(
-    "clientes",
-    []
-  );
+  const [clientes, setClientes] =
+    useState([]);
 
   const [prestamos, setPrestamos] =
-    useLocalStorage("prestamos", []);
+    useState([]);
 
   const sesion = JSON.parse(
     localStorage.getItem("sesion")
   );
 
-  const agregarPrestamo = (prestamo) => {
-    const nuevoPrestamo = {
-      ...prestamo,
-      usuarioId: sesion.id,
+  const cargarClientes =
+    async () => {
+      try {
+        const q = query(
+          collection(db, "clientes"),
+          where(
+            "usuarioId",
+            "==",
+            sesion.uid
+          )
+        );
+
+        const snapshot =
+          await getDocs(q);
+
+        const lista =
+          snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+
+        setClientes(lista);
+      } catch (error) {
+        console.log(error);
+      }
     };
 
-    setPrestamos([
-      ...prestamos,
-      nuevoPrestamo,
-    ]);
-  };
-
-  const eliminarPrestamo = (id) => {
-    const nuevosPrestamos =
-      prestamos.filter(
-        (prestamo) => prestamo.id !== id
+  const cargarPrestamos =
+  async () => {
+    try {
+      const q = query(
+        collection(db, "prestamos"),
+        where(
+          "usuarioId",
+          "==",
+          sesion.uid
+        )
       );
 
-    setPrestamos(nuevosPrestamos);
+      const snapshot =
+        await getDocs(q);
+
+      const lista =
+        snapshot.docs.map((documento) => ({
+          ...documento.data(),
+          firestoreId:
+            documento.id,
+        }));
+
+      setPrestamos(lista);
+    } catch (error) {
+      console.log(error);
+    }
   };
 
-  const obtenerNombreCliente = (
-    clienteId
-  ) => {
-    const cliente = clientes.find(
-      (c) =>
-        String(c.id) ===
-        String(clienteId)
-    );
+  useEffect(() => {
+    cargarClientes();
+    cargarPrestamos();
+  }, []);
 
-    return cliente
-      ? cliente.nombre
-      : "Cliente no encontrado";
+  const agregarPrestamo =
+    async (prestamo) => {
+      try {
+        await addDoc(
+          collection(
+            db,
+            "prestamos"
+          ),
+          {
+            ...prestamo,
+            usuarioId:
+              sesion.uid,
+          }
+        );
+
+        cargarPrestamos();
+      } catch (error) {
+        console.log(error);
+      }
+    };
+
+  const eliminarPrestamo =
+  async (id) => {
+    try {
+      await deleteDoc(
+        doc(
+          db,
+          "prestamos",
+          id
+        )
+      );
+
+      cargarPrestamos();
+    } catch (error) {
+      console.log(error);
+    }
   };
 
-  const clientesUsuario =
-    clientes.filter(
-      (c) => c.usuarioId === sesion.id
-    );
+  const obtenerNombreCliente =
+    (clienteId) => {
+      const cliente =
+        clientes.find(
+          (c) =>
+            String(c.id) ===
+            String(clienteId)
+        );
 
-  const prestamosUsuario =
-    prestamos.filter(
-      (p) => p.usuarioId === sesion.id
-    );
+      return cliente
+        ? cliente.nombre
+        : "Cliente no encontrado";
+    };
 
   return (
     <div>
@@ -67,8 +145,10 @@ function Prestamos() {
 
       <div className="form-card">
         <LoanForm
-          clientes={clientesUsuario}
-          onAdd={agregarPrestamo}
+          clientes={clientes}
+          onAdd={
+            agregarPrestamo
+          }
         />
       </div>
 
@@ -90,17 +170,22 @@ function Prestamos() {
           </thead>
 
           <tbody>
-            {prestamosUsuario.length ===
+            {prestamos.length ===
             0 ? (
               <tr>
                 <td colSpan="10">
-                  No hay préstamos registrados
+                  No hay préstamos
+                  registrados
                 </td>
               </tr>
             ) : (
-              prestamosUsuario.map(
+              prestamos.map(
                 (prestamo) => (
-                  <tr key={prestamo.id}>
+                  <tr
+                    key={
+                      prestamo.id
+                    }
+                  >
                     <td>
                       {obtenerNombreCliente(
                         prestamo.clienteId
@@ -109,41 +194,43 @@ function Prestamos() {
 
                     <td>
                       $
-                      {prestamo.monto.toFixed(
-                        2
-                      )}
+                      {Number(
+                        prestamo.monto
+                      ).toFixed(2)}
                     </td>
 
                     <td>
                       $
-                      {prestamo.interesGenerado.toFixed(
-                        2
-                      )}
+                      {Number(
+                        prestamo.interesGenerado
+                      ).toFixed(2)}
                     </td>
 
                     <td>
                       $
-                      {prestamo.totalPagar.toFixed(
-                        2
-                      )}
+                      {Number(
+                        prestamo.totalPagar
+                      ).toFixed(2)}
                     </td>
 
                     <td>
                       $
-                      {prestamo.valorCuota.toFixed(
-                        2
-                      )}
+                      {Number(
+                        prestamo.valorCuota
+                      ).toFixed(2)}
                     </td>
 
                     <td>
                       $
-                      {prestamo.saldoPendiente.toFixed(
-                        2
-                      )}
+                      {Number(
+                        prestamo.saldoPendiente
+                      ).toFixed(2)}
                     </td>
 
                     <td>
-                      {prestamo.cuotas}
+                      {
+                        prestamo.cuotas
+                      }
                     </td>
 
                     <td>
@@ -160,21 +247,23 @@ function Prestamos() {
                             : "estado-activo"
                         }
                       >
-                        {prestamo.estado}
+                        {
+                          prestamo.estado
+                        }
                       </span>
                     </td>
 
                     <td>
                       <button
-                        className="btn-delete"
-                        onClick={() =>
-                          eliminarPrestamo(
-                            prestamo.id
-                          )
-                        }
-                      >
-                        Eliminar
-                      </button>
+  className="btn-delete"
+  onClick={() =>
+    eliminarPrestamo(
+      prestamo.firestoreId
+    )
+  }
+>
+  Eliminar
+</button>
                     </td>
                   </tr>
                 )

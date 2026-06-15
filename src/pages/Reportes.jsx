@@ -1,51 +1,127 @@
-import { useLocalStorage } from "../hooks/useLocalStorage";
+import { useState, useEffect } from "react";
 import { jsPDF } from "jspdf";
 
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
+
+import { db } from "../firebase/config";
+
 function Reportes() {
-  const [clientes] =
-    useLocalStorage("clientes", []);
+  const [clientes, setClientes] =
+    useState([]);
 
-  const [prestamos] =
-    useLocalStorage("prestamos", []);
+  const [prestamos, setPrestamos] =
+    useState([]);
 
-  const [pagos] =
-    useLocalStorage("pagos", []);
+  const [pagos, setPagos] =
+    useState([]);
 
   const sesion = JSON.parse(
     localStorage.getItem("sesion")
   );
 
-  const clientesUsuario =
-    clientes.filter(
-      (c) => c.usuarioId === sesion.id
-    );
+  useEffect(() => {
+    cargarDatos();
+  }, []);
 
-  const prestamosUsuario =
-    prestamos.filter(
-      (p) => p.usuarioId === sesion.id
-    );
+  const cargarDatos =
+    async () => {
 
-  const pagosUsuario =
-    pagos.filter(
-      (p) => p.usuarioId === sesion.id
-    );
+      const clientesQuery = query(
+        collection(db, "clientes"),
+        where(
+          "usuarioId",
+          "==",
+          sesion.uid
+        )
+      );
+
+      const prestamosQuery = query(
+        collection(db, "prestamos"),
+        where(
+          "usuarioId",
+          "==",
+          sesion.uid
+        )
+      );
+
+      const pagosQuery = query(
+        collection(db, "pagos"),
+        where(
+          "usuarioId",
+          "==",
+          sesion.uid
+        )
+      );
+
+      const clientesSnap =
+        await getDocs(
+          clientesQuery
+        );
+
+      const prestamosSnap =
+        await getDocs(
+          prestamosQuery
+        );
+
+      const pagosSnap =
+        await getDocs(
+          pagosQuery
+        );
+
+      setClientes(
+        clientesSnap.docs.map(
+          (doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })
+        )
+      );
+
+      setPrestamos(
+        prestamosSnap.docs.map(
+          (doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })
+        )
+      );
+
+      setPagos(
+        pagosSnap.docs.map(
+          (doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })
+        )
+      );
+    };
 
   const totalPrestado =
-    prestamosUsuario.reduce(
-      (acc, p) => acc + p.monto,
+    prestamos.reduce(
+      (acc, p) =>
+        acc + Number(p.monto || 0),
       0
     );
 
   const totalCobrado =
-    pagosUsuario.reduce(
-      (acc, p) => acc + p.monto,
+    pagos.reduce(
+      (acc, p) =>
+        acc + Number(p.monto || 0),
       0
     );
 
   const totalPendiente =
-    prestamosUsuario.reduce(
+    prestamos.reduce(
       (acc, p) =>
-        acc + p.saldoPendiente,
+        acc +
+        Number(
+          p.saldoPendiente || 0
+        ),
       0
     );
 
@@ -53,6 +129,7 @@ function Reportes() {
     const doc = new jsPDF();
 
     doc.setFontSize(18);
+
     doc.text(
       "Reporte General",
       20,
@@ -62,19 +139,19 @@ function Reportes() {
     doc.setFontSize(12);
 
     doc.text(
-      `Prestamista: ${sesion.nombre}`,
+      `Usuario: ${sesion.email}`,
       20,
       40
     );
 
     doc.text(
-      `Clientes: ${clientesUsuario.length}`,
+      `Clientes: ${clientes.length}`,
       20,
       60
     );
 
     doc.text(
-      `Prestamos: ${prestamosUsuario.length}`,
+      `Prestamos: ${prestamos.length}`,
       20,
       75
     );
@@ -104,7 +181,7 @@ function Reportes() {
     );
 
     doc.save(
-      `reporte-${sesion.nombre}.pdf`
+      `reporte-${sesion.email}.pdf`
     );
   };
 
@@ -115,21 +192,18 @@ function Reportes() {
       </h1>
 
       <div className="cards">
+
         <div className="card">
           <h3>Clientes</h3>
           <p>
-            {
-              clientesUsuario.length
-            }
+            {clientes.length}
           </p>
         </div>
 
         <div className="card">
           <h3>Préstamos</h3>
           <p>
-            {
-              prestamosUsuario.length
-            }
+            {prestamos.length}
           </p>
         </div>
 
@@ -152,6 +226,7 @@ function Reportes() {
             )}
           </p>
         </div>
+
       </div>
 
       <br />

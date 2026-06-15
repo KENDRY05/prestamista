@@ -1,29 +1,103 @@
+import { useState, useEffect } from "react";
 import PaymentForm from "../components/PaymentForm";
-import { useLocalStorage } from "../hooks/useLocalStorage";
 import { jsPDF } from "jspdf";
 
+import {
+  collection,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  updateDoc,
+  doc,
+  query,
+  where,
+} from "firebase/firestore";
+
+import { db } from "../firebase/config";
+
 function Cobros() {
-  const [clientes] =
-    useLocalStorage("clientes", []);
+  const [clientes, setClientes] =
+    useState([]);
 
   const [prestamos, setPrestamos] =
-    useLocalStorage("prestamos", []);
+    useState([]);
 
   const [pagos, setPagos] =
-    useLocalStorage("pagos", []);
+    useState([]);
 
   const sesion = JSON.parse(
     localStorage.getItem("sesion")
   );
 
-  const prestamosUsuario =
-    prestamos.filter(
-      (p) => p.usuarioId === sesion.id
-    );
+  const cargarClientes =
+    async () => {
+      const q = query(
+        collection(db, "clientes"),
+        where(
+          "usuarioId",
+          "==",
+          sesion.uid
+        )
+      );
 
-  const pagosUsuario = pagos.filter(
-    (p) => p.usuarioId === sesion.id
+      const snapshot =
+        await getDocs(q);
+
+      setClientes(
+        snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+      );
+    };
+
+  const cargarPrestamos = async () => {
+  const q = query(
+    collection(db, "prestamos"),
+    where(
+      "usuarioId",
+      "==",
+      sesion.uid
+    )
   );
+
+  const snapshot =
+    await getDocs(q);
+
+  setPrestamos(
+    snapshot.docs.map((documento) => ({
+      ...documento.data(),
+      firestoreId: documento.id,
+    }))
+  );
+};
+
+ const cargarPagos = async () => {
+  const q = query(
+    collection(db, "pagos"),
+    where(
+      "usuarioId",
+      "==",
+      sesion.uid
+    )
+  );
+
+  const snapshot =
+    await getDocs(q);
+
+  setPagos(
+    snapshot.docs.map((documento) => ({
+      ...documento.data(),
+      firestoreId: documento.id,
+    }))
+  );
+};
+
+  useEffect(() => {
+    cargarClientes();
+    cargarPrestamos();
+    cargarPagos();
+  }, []);
 
   const obtenerNombreCliente = (
     prestamoId
@@ -53,62 +127,65 @@ function Cobros() {
     prestamo,
     cliente
   ) => {
-    const saldoRestante = Math.max(
-      0,
-      prestamo.saldoPendiente - pago.monto
-    );
+    const saldoRestante =
+      Math.max(
+        0,
+        prestamo.saldoPendiente -
+          pago.monto
+      );
 
     const estado =
       saldoRestante <= 0
         ? "Pagado"
         : "Activo";
 
-    const doc = new jsPDF();
+    const docPDF = new jsPDF();
 
-    doc.setFontSize(18);
-    doc.text(
+    docPDF.setFontSize(18);
+
+    docPDF.text(
       "RECIBO DE PAGO",
       65,
       20
     );
 
-    doc.setFontSize(12);
+    docPDF.setFontSize(12);
 
-    doc.text(
+    docPDF.text(
       `Recibo No: ${pago.id}`,
       20,
       40
     );
 
-    doc.text(
+    docPDF.text(
       `Fecha: ${pago.fecha}`,
       20,
       50
     );
 
-    doc.text(
+    docPDF.text(
       `Cliente: ${cliente.nombre}`,
       20,
       60
     );
 
-    doc.text(
-      `Monto Prestamo: $${prestamo.monto.toFixed(
-        2
-      )}`,
+    docPDF.text(
+      `Monto Prestamo: $${Number(
+        prestamo.monto
+      ).toFixed(2)}`,
       20,
       70
     );
 
-    doc.text(
-      `Pago Realizado: $${pago.monto.toFixed(
-        2
-      )}`,
+    docPDF.text(
+      `Pago Realizado: $${Number(
+        pago.monto
+      ).toFixed(2)}`,
       20,
       80
     );
 
-    doc.text(
+    docPDF.text(
       `Saldo Pendiente: $${saldoRestante.toFixed(
         2
       )}`,
@@ -116,151 +193,152 @@ function Cobros() {
       90
     );
 
-    doc.text(
+    docPDF.text(
       `Estado: ${estado}`,
       20,
       100
     );
 
-    doc.line(
+    docPDF.line(
       20,
       130,
       80,
       130
     );
 
-    doc.text(
+    docPDF.text(
       "Firma Prestamista",
       20,
       140
     );
 
-    doc.save(
-      `recibo-${cliente.nombre}-${pago.id}.pdf`
+    docPDF.save(
+      `recibo-${cliente.nombre}.pdf`
     );
   };
 
-  const registrarPago = (pago) => {
-    const prestamoActual =
-      prestamos.find(
-        (p) =>
-          String(p.id) ===
-          String(pago.prestamoId)
-      );
+  const registrarPago =
+    async (pago) => {
+      const prestamoActual =
+        prestamos.find(
+          (p) =>
+            String(p.id) ===
+            String(
+              pago.prestamoId
+            )
+        );
 
-    if (!prestamoActual) return;
+      if (!prestamoActual)
+        return;
 
-    const clienteActual =
-      clientes.find(
-        (c) =>
-          String(c.id) ===
-          String(
-            prestamoActual.clienteId
-          )
-      );
+      const clienteActual =
+        clientes.find(
+          (c) =>
+            String(c.id) ===
+            String(
+              prestamoActual.clienteId
+            )
+        );
 
-    const nuevosPrestamos =
-      prestamos.map((prestamo) => {
-        if (
-          String(prestamo.id) ===
-          String(pago.prestamoId)
-        ) {
-          const nuevoSaldo =
-            prestamo.saldoPendiente -
-            pago.monto;
+      const nuevoSaldo =
+        prestamoActual.saldoPendiente -
+        pago.monto;
 
-          return {
-            ...prestamo,
+      await updateDoc(
+        doc(
+          db,
+          "prestamos",
+      prestamoActual.firestoreId
+        ),
+        {
+          saldoPendiente:
+            nuevoSaldo <= 0
+              ? 0
+              : nuevoSaldo,
 
-            saldoPendiente:
-              nuevoSaldo <= 0
-                ? 0
-                : nuevoSaldo,
+          cuotasPagadas:
+            (prestamoActual.cuotasPagadas ||
+              0) + 1,
 
-            cuotasPagadas:
-              (prestamo.cuotasPagadas ||
-                0) + 1,
-
-            estado:
-              nuevoSaldo <= 0
-                ? "Pagado"
-                : "Activo",
-          };
+          estado:
+            nuevoSaldo <= 0
+              ? "Pagado"
+              : "Activo",
         }
+      );
 
-        return prestamo;
-      });
+      await addDoc(
+        collection(db, "pagos"),
+        {
+          ...pago,
+          usuarioId:
+            sesion.uid,
+        }
+      );
 
-    setPrestamos(
-      nuevosPrestamos
-    );
+      generarReciboPDF(
+        pago,
+        prestamoActual,
+        clienteActual
+      );
 
-    const pagoConUsuario = {
-      ...pago,
-      usuarioId: sesion.id,
+      cargarPrestamos();
+      cargarPagos();
     };
 
-    setPagos([
-      ...pagos,
-      pagoConUsuario,
-    ]);
-
-    generarReciboPDF(
-      pago,
-      prestamoActual,
-      clienteActual
-    );
-  };
-
-  const eliminarPago = (
-    pagoEliminar
-  ) => {
+ const eliminarPago =
+  async (pagoEliminar) => {
     const confirmar =
       window.confirm(
         "¿Desea eliminar este cobro?"
       );
 
-    if (!confirmar) return;
+    if (!confirmar)
+      return;
 
-    const nuevosPrestamos =
-      prestamos.map((prestamo) => {
-        if (
-          String(prestamo.id) ===
+    const prestamo =
+      prestamos.find(
+        (p) =>
+          String(p.id) ===
           String(
             pagoEliminar.prestamoId
           )
-        ) {
-          return {
-            ...prestamo,
+      );
 
-            saldoPendiente:
-              prestamo.saldoPendiente +
-              pagoEliminar.monto,
+    if (prestamo) {
+      await updateDoc(
+        doc(
+          db,
+          "prestamos",
+          prestamo.firestoreId
+        ),
+        {
+          saldoPendiente:
+            prestamo.saldoPendiente +
+            pagoEliminar.monto,
 
-            cuotasPagadas:
-              Math.max(
-                0,
-                (prestamo.cuotasPagadas ||
-                  0) - 1
-              ),
+          cuotasPagadas:
+            Math.max(
+              0,
+              (prestamo.cuotasPagadas ||
+                0) - 1
+            ),
 
-            estado: "Activo",
-          };
+          estado: "Activo",
         }
+      );
+    }
 
-        return prestamo;
-      });
-
-    setPrestamos(
-      nuevosPrestamos
-    );
-
-    setPagos(
-      pagos.filter(
-        (p) =>
-          p.id !== pagoEliminar.id
+    await deleteDoc(
+      doc(
+        db,
+        "pagos",
+        pagoEliminar.firestoreId
       )
     );
+
+    cargarPrestamos();
+    cargarPagos();
   };
 
   return (
@@ -271,9 +349,7 @@ function Cobros() {
 
       <div className="form-card">
         <PaymentForm
-          prestamos={
-            prestamosUsuario
-          }
+          prestamos={prestamos}
           clientes={clientes}
           onAdd={registrarPago}
         />
@@ -291,7 +367,7 @@ function Cobros() {
           </thead>
 
           <tbody>
-            {pagosUsuario.length ===
+            {pagos.length ===
             0 ? (
               <tr>
                 <td colSpan="4">
@@ -300,7 +376,7 @@ function Cobros() {
                 </td>
               </tr>
             ) : (
-              pagosUsuario.map(
+              pagos.map(
                 (pago) => (
                   <tr key={pago.id}>
                     <td>
@@ -315,9 +391,9 @@ function Cobros() {
 
                     <td>
                       $
-                      {pago.monto.toFixed(
-                        2
-                      )}
+                      {Number(
+                        pago.monto
+                      ).toFixed(2)}
                     </td>
 
                     <td>

@@ -15,10 +15,10 @@ function PaymentForm({
     clienteId
   ) => {
     const cliente = clientes.find(
-      (c) =>
-        String(c.id) ===
-        String(clienteId)
-    );
+  (c) =>
+    String(c.id) ===
+    String(clienteId)
+);
 
     return cliente
       ? cliente.nombre

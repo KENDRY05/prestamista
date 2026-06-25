@@ -41,11 +41,11 @@ function ClientForm({ onAdd }) {
       </div>
 
       <div className="form-group">
-        <label>Teléfono</label>
+        <label>Fecha de ingreso</label>
 
         <input
           type="text"
-          placeholder="Teléfono"
+          placeholder="fecha de ingreso"
           value={telefono}
           onChange={(e) =>
             setTelefono(e.target.value)

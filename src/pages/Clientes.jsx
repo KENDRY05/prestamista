@@ -125,7 +125,7 @@ function Clientes() {
           <thead>
             <tr>
               <th>Nombre</th>
-              <th>Teléfono</th>
+              <th>Fecha de ingreso</th>
               <th>Dirección</th>
               <th>Acciones</th>
             </tr>

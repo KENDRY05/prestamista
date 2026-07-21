@@ -1,30 +1,69 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-function ClientForm({ onAdd }) {
+function ClientForm({
+  onAdd,
+  clienteEditando,
+  onUpdate,
+  onCancelEdit,
+}) {
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [direccion, setDireccion] = useState("");
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (clienteEditando) {
+      setNombre(clienteEditando.nombre || "");
+      setTelefono(clienteEditando.telefono || "");
+      setDireccion(clienteEditando.direccion || "");
+    } else {
+      setNombre("");
+      setTelefono("");
+      setDireccion("");
+    }
+  }, [clienteEditando]);
 
-    const nuevoCliente = {
-      id: Date.now(),
-      nombre,
-      telefono,
-      direccion,
-    };
-
-    onAdd(nuevoCliente);
-
+  const limpiarFormulario = () => {
     setNombre("");
     setTelefono("");
     setDireccion("");
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const datosCliente = {
+      nombre: nombre.trim(),
+      telefono: telefono.trim(),
+      direccion: direccion.trim(),
+    };
+
+    if (clienteEditando) {
+      await onUpdate({
+        ...clienteEditando,
+        ...datosCliente,
+      });
+    } else {
+      await onAdd({
+        id: Date.now(),
+        ...datosCliente,
+      });
+    }
+
+    limpiarFormulario();
+  };
+
+  const cancelarEdicion = () => {
+    limpiarFormulario();
+    onCancelEdit();
+  };
+
   return (
     <form onSubmit={handleSubmit}>
-      <h2>Nuevo Cliente</h2>
+      <h2>
+        {clienteEditando
+          ? "Editar Cliente"
+          : "Nuevo Cliente"}
+      </h2>
 
       <div className="form-group">
         <label>Nombre</label>
@@ -45,7 +84,7 @@ function ClientForm({ onAdd }) {
 
         <input
           type="text"
-          placeholder="fecha de ingreso"
+          placeholder="Fecha de ingreso"
           value={telefono}
           onChange={(e) =>
             setTelefono(e.target.value)
@@ -70,8 +109,21 @@ function ClientForm({ onAdd }) {
         type="submit"
         className="btn-primary"
       >
-        Guardar Cliente
+        {clienteEditando
+          ? "Actualizar Cliente"
+          : "Guardar Cliente"}
       </button>
+
+      {clienteEditando && (
+        <button
+          type="button"
+          className="btn-delete"
+          onClick={cancelarEdicion}
+          style={{ marginLeft: "10px" }}
+        >
+          Cancelar
+        </button>
+      )}
     </form>
   );
 }

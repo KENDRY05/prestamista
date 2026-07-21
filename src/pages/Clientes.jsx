@@ -7,6 +7,7 @@ import {
   addDoc,
   getDocs,
   deleteDoc,
+  updateDoc,
   doc,
   query,
   where,
@@ -16,87 +17,128 @@ import { db } from "../firebase/config";
 
 function Clientes() {
   const [clientes, setClientes] = useState([]);
-
-  const [busqueda, setBusqueda] =
-    useState("");
+  const [busqueda, setBusqueda] = useState("");
+  const [clienteEditando, setClienteEditando] =
+    useState(null);
 
   const sesion = JSON.parse(
     localStorage.getItem("sesion")
   );
 
   const cargarClientes = async () => {
-  try {
-    const q = query(
-      collection(db, "clientes"),
-      where(
-        "usuarioId",
-        "==",
-        sesion.uid
-      )
-    );
-
-    const snapshot =
-      await getDocs(q);
-
-    const lista =
-      snapshot.docs.map((documento) => ({
-        ...documento.data(),
-        firestoreId: documento.id,
-      }));
-
-    setClientes(lista);
-  } catch (error) {
-    console.log(error);
-  }
-};
-
-  useEffect(() => {
-    cargarClientes();
-  }, []);
-
-  const agregarCliente =
-    async (cliente) => {
-      try {
-        await addDoc(
-          collection(db, "clientes"),
-          {
-            ...cliente,
-            usuarioId:
-              sesion.uid,
-          }
-        );
-
-        cargarClientes();
-      } catch (error) {
-        console.log(error);
-      }
-    };
-
-  const eliminarCliente =
-  async (id) => {
     try {
-      await deleteDoc(
-        doc(
-          db,
-          "clientes",
-          id
+      const q = query(
+        collection(db, "clientes"),
+        where(
+          "usuarioId",
+          "==",
+          sesion.uid
         )
       );
 
-      cargarClientes();
+      const snapshot = await getDocs(q);
+
+      const lista = snapshot.docs.map(
+        (documento) => ({
+          ...documento.data(),
+          firestoreId: documento.id,
+        })
+      );
+
+      setClientes(lista);
     } catch (error) {
       console.log(error);
     }
   };
 
-  const filtrados =
-    clientes.filter((c) =>
-      c.nombre
-        .toLowerCase()
-        .includes(
-          busqueda.toLowerCase()
-        )
+  useEffect(() => {
+    cargarClientes();
+  }, []);
+
+  const agregarCliente = async (cliente) => {
+    try {
+      await addDoc(
+        collection(db, "clientes"),
+        {
+          ...cliente,
+          usuarioId: sesion.uid,
+        }
+      );
+
+      await cargarClientes();
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const actualizarCliente = async (
+    clienteActualizado
+  ) => {
+    try {
+      await updateDoc(
+        doc(
+          db,
+          "clientes",
+          clienteActualizado.firestoreId
+        ),
+        {
+          nombre: clienteActualizado.nombre,
+          telefono:
+            clienteActualizado.telefono,
+          direccion:
+            clienteActualizado.direccion,
+        }
+      );
+
+      setClienteEditando(null);
+      await cargarClientes();
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const eliminarCliente = async (id) => {
+    const confirmar = window.confirm(
+      "¿Desea eliminar este cliente?"
     );
+
+    if (!confirmar) return;
+
+    try {
+      await deleteDoc(
+        doc(db, "clientes", id)
+      );
+
+      if (
+        clienteEditando?.firestoreId === id
+      ) {
+        setClienteEditando(null);
+      }
+
+      await cargarClientes();
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const iniciarEdicion = (cliente) => {
+    setClienteEditando(cliente);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  const cancelarEdicion = () => {
+    setClienteEditando(null);
+  };
+
+  const filtrados = clientes.filter((c) =>
+    c.nombre
+      .toLowerCase()
+      .includes(busqueda.toLowerCase())
+  );
 
   return (
     <div className="clientes-container">
@@ -105,6 +147,9 @@ function Clientes() {
       <div className="form-card">
         <ClientForm
           onAdd={agregarCliente}
+          clienteEditando={clienteEditando}
+          onUpdate={actualizarCliente}
+          onCancelEdit={cancelarEdicion}
         />
       </div>
 
@@ -114,9 +159,7 @@ function Clientes() {
         placeholder="🔍 Buscar cliente..."
         value={busqueda}
         onChange={(e) =>
-          setBusqueda(
-            e.target.value
-          )
+          setBusqueda(e.target.value)
         }
       />
 
@@ -132,41 +175,46 @@ function Clientes() {
           </thead>
 
           <tbody>
-            {filtrados.map(
-              (cliente) => (
+            {filtrados.length === 0 ? (
+              <tr>
+                <td colSpan="4">
+                  No hay clientes registrados
+                </td>
+              </tr>
+            ) : (
+              filtrados.map((cliente) => (
                 <tr
-                  key={cliente.id}
+                  key={cliente.firestoreId}
                 >
-                  <td>
-                    {cliente.nombre}
-                  </td>
+                  <td>{cliente.nombre}</td>
 
-                  <td>
-                    {
-                      cliente.telefono
-                    }
-                  </td>
+                  <td>{cliente.telefono}</td>
 
-                  <td>
-                    {
-                      cliente.direccion
-                    }
-                  </td>
+                  <td>{cliente.direccion}</td>
 
                   <td>
                     <button
-  className="btn-delete"
-  onClick={() =>
-    eliminarCliente(
-      cliente.firestoreId
-    )
-  }
->
-  Eliminar
-</button>
+                      className="btn-edit"
+                      onClick={() =>
+                        iniciarEdicion(cliente)
+                      }
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      className="btn-delete"
+                      onClick={() =>
+                        eliminarCliente(
+                          cliente.firestoreId
+                        )
+                      }
+                    >
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
-              )
+              ))
             )}
           </tbody>
         </table>

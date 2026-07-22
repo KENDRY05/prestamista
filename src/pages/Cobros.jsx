@@ -328,7 +328,7 @@ function Cobros() {
         }
       );
     }
-
+    
     await deleteDoc(
       doc(
         db,
@@ -340,7 +340,31 @@ function Cobros() {
     cargarPrestamos();
     cargarPagos();
   };
+    const convertirFecha = (fecha) => {
+    if (!fecha) return new Date(0);
 
+    const partes = fecha
+      .split("/")
+      .map(Number);
+
+    if (partes.length !== 3) {
+      return new Date(0);
+    }
+
+    const [dia, mes, anio] = partes;
+
+    return new Date(
+      anio,
+      mes - 1,
+      dia
+    );
+  };
+
+  const pagosOrdenados = [...pagos].sort(
+    (a, b) =>
+      convertirFecha(b.fecha) -
+      convertirFecha(a.fecha)
+  );
   return (
     <div>
       <h1 className="page-header">
@@ -367,7 +391,7 @@ function Cobros() {
           </thead>
 
           <tbody>
-            {pagos.length ===
+            {pagosOrdenados.length ===
             0 ? (
               <tr>
                 <td colSpan="4">
@@ -376,7 +400,7 @@ function Cobros() {
                 </td>
               </tr>
             ) : (
-              pagos.map(
+              pagosOrdenados.map(
                 (pago) => (
                   <tr key={pago.id}>
                     <td>
